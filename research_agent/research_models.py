@@ -30,7 +30,9 @@ class Reflection(BaseModel):
 
 
 class SourceSegment(BaseModel):
-    label: str = Field(description="Human readable label for the cited source.")
+    label: str = Field(
+        description="Human readable label for the cited source."
+    )
     value: str | None = Field(
         default=None,
         description="Original source URL, if available.",
@@ -45,7 +47,8 @@ class Citation(BaseModel):
         description="End index (exclusive) of the text span covered by this citation."
     )
     segments: List[SourceSegment] = Field(
-        default_factory=list, description="Source segments supporting the citation."
+        default_factory=list,
+        description="Source segments supporting the citation.",
     )
 
 
@@ -56,7 +59,8 @@ class WebResearchResult(BaseModel):
         description="Model generated summary of the web research findings."
     )
     sources: List[SourceSegment] = Field(
-        default_factory=list, description="Flattened list of cited source segments."
+        default_factory=list,
+        description="Flattened list of cited source segments.",
     )
     citations: List[Citation] = Field(
         default_factory=list, description="Structured citation spans."

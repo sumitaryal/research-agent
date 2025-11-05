@@ -42,10 +42,14 @@ def get_research_topic(messages: Sequence[AnyMessage]) -> str:
     research_topic = ""
     for message in messages:
         if isinstance(message, HumanMessage):
-            content = str(message.content) if message.content is not None else ""
+            content = (
+                str(message.content) if message.content is not None else ""
+            )
             research_topic += f"User: {content}\n"
         elif isinstance(message, AIMessage):
-            content = str(message.content) if message.content is not None else ""
+            content = (
+                str(message.content) if message.content is not None else ""
+            )
             research_topic += f"Assistant: {content}\n"
     return research_topic
 

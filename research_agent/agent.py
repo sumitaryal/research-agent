@@ -101,7 +101,10 @@ class ResearchAgent:
                 deadline_seconds = None
         else:
             deadline_seconds = None
-        if deadline_seconds is None and configuration.response_deadline_seconds:
+        if (
+            deadline_seconds is None
+            and configuration.response_deadline_seconds
+        ):
             deadline_seconds = float(configuration.response_deadline_seconds)
 
         query_budget_limit = configuration.per_run_query_budget

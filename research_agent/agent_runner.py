@@ -10,7 +10,11 @@ from typing import Iterable, TYPE_CHECKING
 
 from google.genai import Client
 
-from .budgeting import AdaptiveMetrics, ThinkingBudgetContext, estimate_answer_length_target
+from .budgeting import (
+    AdaptiveMetrics,
+    ThinkingBudgetContext,
+    estimate_answer_length_target,
+)
 from .config import Configuration
 from .research_models import Reflection, SourceSegment, WebResearchResult
 from .research_utils import get_citations, insert_citation_markers
@@ -261,7 +265,8 @@ class ResearchGraphRunner:
                 return False
         if (
             self.reflection_task is not None
-            and self.completed_since_reflection >= self.current_reflection_interval
+            and self.completed_since_reflection
+            >= self.current_reflection_interval
         ):
             return False
         return True
@@ -284,7 +289,9 @@ class ResearchGraphRunner:
             return False
         if not self.inflight_tasks and not self.pending_queries:
             return True
-        return self.completed_since_reflection >= self.current_reflection_interval
+        return (
+            self.completed_since_reflection >= self.current_reflection_interval
+        )
 
     def _start_reflection_task(self) -> None:
         if self.reflection_task is not None or not self.web_research_summaries:
@@ -293,11 +300,13 @@ class ResearchGraphRunner:
             phase="reflection",
             research_topic=self.research_topic,
             executed_queries=len(self.executed_queries),
-            pending_queries=len(self.pending_queries) + len(self.inflight_tasks),
+            pending_queries=len(self.pending_queries)
+            + len(self.inflight_tasks),
             reflection_gap=self.completed_since_reflection,
         )
         model_name = (
-            self.reasoning_model_override or self.configuration.reflection_model
+            self.reasoning_model_override
+            or self.configuration.reflection_model
         )
         self.reflection_task = asyncio.create_task(
             self.agent._reflect(
@@ -330,7 +339,10 @@ class ResearchGraphRunner:
                 },
             )
 
-        if self.adaptive_metrics.sample_size < self.adaptive_metrics_min_samples:
+        if (
+            self.adaptive_metrics.sample_size
+            < self.adaptive_metrics_min_samples
+        ):
             return
 
         desired_concurrency = self.current_search_concurrency
@@ -339,7 +351,8 @@ class ResearchGraphRunner:
             or avg_latency >= self.latency_high_threshold
         ):
             desired_concurrency = max(
-                self.min_search_concurrency, self.current_search_concurrency - 1
+                self.min_search_concurrency,
+                self.current_search_concurrency - 1,
             )
         elif (
             failure_rate <= self.adaptive_failure_rate_increase_threshold
@@ -347,7 +360,8 @@ class ResearchGraphRunner:
             and self.current_search_concurrency < self.max_search_concurrency
         ):
             desired_concurrency = min(
-                self.max_search_concurrency, self.current_search_concurrency + 1
+                self.max_search_concurrency,
+                self.current_search_concurrency + 1,
             )
 
         if desired_concurrency != self.current_search_concurrency:
@@ -369,7 +383,8 @@ class ResearchGraphRunner:
             or avg_latency >= self.latency_high_threshold
         ):
             desired_interval = max(
-                self.reflection_interval_min, self.current_reflection_interval - 1
+                self.reflection_interval_min,
+                self.current_reflection_interval - 1,
             )
         elif (
             failure_rate <= self.adaptive_failure_rate_increase_threshold
@@ -377,7 +392,8 @@ class ResearchGraphRunner:
             and self.current_reflection_interval < self.reflection_interval_max
         ):
             desired_interval = min(
-                self.reflection_interval_max, self.current_reflection_interval + 1
+                self.reflection_interval_max,
+                self.current_reflection_interval + 1,
             )
 
         if desired_interval != self.current_reflection_interval:
@@ -406,7 +422,9 @@ class ResearchGraphRunner:
         return GraphState.SYNTHESIZE
 
     async def _handle_search(self) -> GraphState:
-        while (self.pending_queries or self.inflight_tasks) and not self.satisfied:
+        while (
+            self.pending_queries or self.inflight_tasks
+        ) and not self.satisfied:
             while (
                 self.pending_queries
                 and len(self.inflight_tasks) < self.current_search_concurrency
@@ -415,7 +433,10 @@ class ResearchGraphRunner:
             ):
                 await self._launch_next_query()
 
-            if self.reflection_task is not None and self.reflection_task.done():
+            if (
+                self.reflection_task is not None
+                and self.reflection_task.done()
+            ):
                 return GraphState.REFLECT
 
             if not self.inflight_tasks:
@@ -446,7 +467,9 @@ class ResearchGraphRunner:
 
     async def _launch_next_query(self) -> None:
         query_id, query = self.pending_queries.popleft()
-        pending_snapshot = len(self.pending_queries) + len(self.inflight_tasks) + 1
+        pending_snapshot = (
+            len(self.pending_queries) + len(self.inflight_tasks) + 1
+        )
         web_context = ThinkingBudgetContext(
             phase="web_search",
             research_topic=self.research_topic,
@@ -489,7 +512,9 @@ class ResearchGraphRunner:
                     "error": repr(exc),
                 },
             )
-            research_result = WebResearchResult(summary="", sources=[], citations=[])
+            research_result = WebResearchResult(
+                summary="", sources=[], citations=[]
+            )
         self.adaptive_metrics.record(duration, success)
 
         self.executed_queries.append(query)
@@ -564,7 +589,8 @@ class ResearchGraphRunner:
                 phase="reflection",
                 research_topic=self.research_topic,
                 executed_queries=len(self.executed_queries),
-                pending_queries=len(self.pending_queries) + len(self.inflight_tasks),
+                pending_queries=len(self.pending_queries)
+                + len(self.inflight_tasks),
                 reflection_gap=self.completed_since_reflection,
             )
             reflection_result = await self.agent._reflect(
@@ -637,7 +663,9 @@ class ResearchGraphRunner:
                 await self.cancel_inflight_tasks()
                 self.pending_queries.clear()
 
-        novelty_window_filled = len(self.recent_query_novelty) >= self.novelty_window
+        novelty_window_filled = (
+            len(self.recent_query_novelty) >= self.novelty_window
+        )
         novelty_exhausted = novelty_window_filled and not any(
             self.recent_query_novelty
         )
@@ -675,7 +703,8 @@ class ResearchGraphRunner:
             phase="final_answer",
             research_topic=self.research_topic,
             executed_queries=len(self.executed_queries),
-            pending_queries=len(self.pending_queries) + len(self.inflight_tasks),
+            pending_queries=len(self.pending_queries)
+            + len(self.inflight_tasks),
             reflection_gap=self.completed_since_reflection,
             answer_length_target=estimate_answer_length_target(
                 self.research_topic,
@@ -687,7 +716,8 @@ class ResearchGraphRunner:
         final_answer, unique_sources = await self.agent._finalize_answer(
             client=self.client,
             model_name=(
-                self.reasoning_model_override or self.configuration.answer_model
+                self.reasoning_model_override
+                or self.configuration.answer_model
             ),
             research_topic=self.research_topic,
             summaries=self.web_research_summaries,

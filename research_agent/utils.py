@@ -32,4 +32,3 @@ def ensure_messages(
 
 
 __all__ = ["ensure_messages", "strip_code_fence"]
-

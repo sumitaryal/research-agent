@@ -13,7 +13,9 @@ class ConfigurationError(ValueError):
 class Configuration(BaseSettings):
     """The configuration for the agent."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8"
+    )
 
     query_generator_model: str = Field(
         default="gemini-2.5-flash",
@@ -144,7 +146,9 @@ class Configuration(BaseSettings):
     ) -> "Configuration":
         """Create a Configuration instance from a mapping-style config payload."""
         configurable_raw = (
-            config.get("configurable") if config and "configurable" in config else {}
+            config.get("configurable")
+            if config and "configurable" in config
+            else {}
         )
 
         if not isinstance(configurable_raw, Mapping):
@@ -152,7 +156,9 @@ class Configuration(BaseSettings):
                 "Expected 'configurable' overrides to be a mapping of string keys."
             )
 
-        invalid_keys = [key for key in configurable_raw.keys() if not isinstance(key, str)]
+        invalid_keys = [
+            key for key in configurable_raw.keys() if not isinstance(key, str)
+        ]
         if invalid_keys:
             raise ConfigurationError(
                 f"Configurable override keys must be strings (got {invalid_keys})."
@@ -198,7 +204,9 @@ class Configuration(BaseSettings):
         ):
             value = getattr(self, field_name)
             if value <= 0:
-                errors.append(f"{field_name} must be greater than 0 (got {value}).")
+                errors.append(
+                    f"{field_name} must be greater than 0 (got {value})."
+                )
 
         if self.search_concurrency_min > self.search_concurrency_max:
             errors.append(
@@ -224,7 +232,9 @@ class Configuration(BaseSettings):
                 f"latency_high_threshold must be greater than 0 (got {self.latency_high_threshold})."
             )
         if self.latency_high_threshold < self.latency_low_threshold:
-            errors.append("latency_high_threshold cannot be less than latency_low_threshold.")
+            errors.append(
+                "latency_high_threshold cannot be less than latency_low_threshold."
+            )
         if self.baseline_latency_estimate <= 0:
             errors.append(
                 f"baseline_latency_estimate must be greater than 0 (got {self.baseline_latency_estimate})."
@@ -256,7 +266,9 @@ class Configuration(BaseSettings):
         ):
             value = getattr(self, field_name)
             if not 0 <= value <= 1:
-                errors.append(f"{field_name} must be between 0 and 1 (got {value}).")
+                errors.append(
+                    f"{field_name} must be between 0 and 1 (got {value})."
+                )
         if (
             self.adaptive_failure_rate_increase_threshold
             > self.adaptive_failure_rate_reduce_threshold
