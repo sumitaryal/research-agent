@@ -4,9 +4,39 @@ Async-first research agent that plans, searches, reflects, and synthesizes groun
 
 ## Getting Started
 
-- Python 3.12+ and a Google Gemini API key (`GEMINI_API_KEY` environment variable or `.env` file).
-- Install dependencies: `pip install -e .` (uses `pyproject.toml`).
-- Run the sample script: `python main.py` (updates `main.py` to change the user prompt).
+1. Install [`uv`](https://docs.astral.sh/uv/) if it's not on your PATH:
+
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. Create and activate an isolated environment (uses `.venv`):
+
+   ```bash
+   uv venv
+   source .venv/bin/activate
+   ```
+
+3. Sync project dependencies (respecting `pyproject.toml` and lock data):
+
+   ```bash
+   uv sync
+   ```
+
+4. Configure credentials:
+
+   ```bash
+   # copy the template and add your secrets
+   cp .env.example .env
+   # edit .env and set:
+   # GEMINI_API_KEY=your_key_here
+   ```
+
+5. Run the sample script with the environment file applied (edit `main.py` to change the prompt):
+
+   ```bash
+   uv run --env-file .env python main.py
+   ```
 
 ## Usage
 
