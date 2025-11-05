@@ -25,6 +25,20 @@ class ThinkingBudgetContext:
     answer_length_target: int | None = None
 
 
+@dataclass(frozen=True)
+class ModelBudgetProfile:
+    """Static defaults and hard limits for model thinking budgets."""
+
+    default: int
+    minimum: int
+    heuristic_ceiling: int | None = None
+
+    def clamp(self, value: int) -> int:
+        if self.heuristic_ceiling is not None:
+            value = min(self.heuristic_ceiling, value)
+        return max(self.minimum, value)
+
+
 @dataclass
 class AdaptiveMetrics:
     """Sliding window tracker for latency and success rates."""
@@ -143,6 +157,29 @@ def _estimate_complexity_score(context: ThinkingBudgetContext) -> float:
     return max(1.0, 1.0 + topic_factor + query_factor + reflection_factor)
 
 
+_MODEL_BUDGET_PROFILES: dict[str, ModelBudgetProfile] = {
+    "gemini-2.5-pro": ModelBudgetProfile(
+        default=128,
+        minimum=128,
+        heuristic_ceiling=32768,
+    ),
+    "gemini-2.5-flash": ModelBudgetProfile(
+        default=0,
+        minimum=0,
+        heuristic_ceiling=24576,
+    ),
+}
+
+
+def _resolve_budget_profile(
+    normalized_model: str,
+) -> ModelBudgetProfile | None:
+    for signature, profile in _MODEL_BUDGET_PROFILES.items():
+        if signature in normalized_model:
+            return profile
+    return None
+
+
 def _thinking_budget_for_model(
     model_name: str,
     *,
@@ -151,15 +188,12 @@ def _thinking_budget_for_model(
 ) -> int | None:
     """Return the desired thinking budget for known Gemini models."""
     normalized = model_name.lower()
-    pro_default = 128
-    flash_default = 0
+    profile = _resolve_budget_profile(normalized)
+    if profile is None:
+        return None
 
     if not dynamic_enabled or context is None:
-        if "gemini-2.5-pro" in normalized:
-            return pro_default
-        if "gemini-2.5-flash" in normalized:
-            return flash_default
-        return None
+        return profile.default
 
     complexity = _estimate_complexity_score(context)
     pending_pressure = min(context.pending_queries / 3.0, 2.5)
@@ -181,14 +215,14 @@ def _thinking_budget_for_model(
         elif target >= 350:
             length_boost = 12
         reflection_adjustment = 18 if context.phase == "reflection" else 0
-        budget = (
+        raw_budget = (
             base
             + complexity_boost
             + length_boost
             + reflection_adjustment
             + int(pending_pressure * 6)
         )
-        return max(64, min(224, budget))
+        return profile.clamp(raw_budget)
     if "gemini-2.5-flash" in normalized:
         if context.phase == "query_generation":
             base = 4
@@ -198,11 +232,16 @@ def _thinking_budget_for_model(
             base = 18
         complexity_boost = int(complexity * 4)
         reflection_boost = 6 if context.phase == "reflection" else 0
-        budget = base + complexity_boost + reflection_boost + int(
-            pending_pressure * 4
+        raw_budget = (
+            base
+            + complexity_boost
+            + reflection_boost
+            + int(pending_pressure * 4)
         )
-        return max(0, min(72, budget))
-    return None
+        return profile.clamp(raw_budget)
+    return profile.default
+
+
 __all__ = [
     "AdaptiveMetrics",
     "ThinkingBudgetContext",
