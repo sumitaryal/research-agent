@@ -3,13 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, cast
 
 from google.genai import Client
 from pydantic import ValidationError
 
 from .config import Configuration, ConfigurationError
-from .message_types import AIMessage, HumanMessage
+from .message_types import AIMessage, HumanMessage, AnyMessage
 from .prompts import (
     answer_instructions,
     get_current_date,
@@ -27,6 +27,7 @@ from .research_models import (
 from .workflow_state import OverallState
 from .research_utils import (
     get_citations,
+    get_conversation_history,
     get_research_topic,
     insert_citation_markers,
     resolve_urls,
@@ -45,6 +46,18 @@ logger = logging.getLogger(__name__)
 
 class ResearchAgent:
     """Research workflow powered directly by the Google GenAI client."""
+
+    @staticmethod
+    def _coerce_transcript(
+        messages: Iterable[AnyMessage]
+        | AnyMessage
+        | str,
+    ) -> list[AnyMessage]:
+        if isinstance(messages, str):
+            return [HumanMessage(content=messages)]
+        if isinstance(messages, (HumanMessage, AIMessage)):
+            return [messages]
+        return list(cast(Iterable[AnyMessage], messages))
 
     async def ainvoke(
         self, state: OverallState, config: Mapping[str, Any] | None = None
@@ -115,6 +128,7 @@ class ResearchAgent:
         metrics_log_interval = configuration.metrics_log_interval
 
         messages = ensure_messages(state.get("messages"))
+        conversation_history = get_conversation_history(messages)
         research_topic = get_research_topic(messages)
 
         initial_query_count = adaptive_initial_query_count(
@@ -130,6 +144,7 @@ class ResearchAgent:
             client=client,
             model_name=configuration.query_generator_model,
             research_topic=research_topic,
+            conversation_history=conversation_history,
             initial_query_count=initial_query_count,
             dynamic_budget_enabled=configuration.dynamic_thinking_budget,
         )
@@ -228,14 +243,26 @@ class ResearchAgent:
         return run_result
 
     async def achat(
-        self, query: str, config: Mapping[str, Any] | None = None
+        self,
+        messages: Iterable[HumanMessage | AIMessage]
+        | HumanMessage
+        | AIMessage
+        | str,
+        config: Mapping[str, Any] | None = None,
     ) -> ResearchRunResult:
-        """Async convenience wrapper for running the agent with a single user query."""
-        state: OverallState = {"messages": [HumanMessage(content=query)]}
+        """Async wrapper that accepts a conversation transcript."""
+        state: OverallState = {
+            "messages": self._coerce_transcript(messages),
+        }
         return await self.ainvoke(state, config)
 
     def chat(
-        self, query: str, config: Mapping[str, Any] | None = None
+        self,
+        messages: Iterable[HumanMessage | AIMessage]
+        | HumanMessage
+        | AIMessage
+        | str,
+        config: Mapping[str, Any] | None = None,
     ) -> ResearchRunResult:
         """Synchronous convenience wrapper; use achat(...) when already in an event loop."""
         try:
@@ -249,7 +276,7 @@ class ResearchAgent:
                 "await achat(...) instead."
             )
 
-        return asyncio.run(self.achat(query, config))
+        return asyncio.run(self.achat(messages, config))
 
     def invoke(
         self, state: OverallState, config: Mapping[str, Any] | None = None
@@ -272,13 +299,16 @@ class ResearchAgent:
         client: Client,
         model_name: str,
         research_topic: str,
+        conversation_history: str,
         initial_query_count: int,
         dynamic_budget_enabled: bool,
     ) -> SearchQueryList:
+        history_block = conversation_history.strip() or "No prior conversation provided."
         formatted_prompt = query_writer_instructions.format(
             current_date=get_current_date(),
             research_topic=research_topic,
             number_queries=initial_query_count,
+            conversation_history=history_block,
         )
 
         logger.info(

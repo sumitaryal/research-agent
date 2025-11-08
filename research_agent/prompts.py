@@ -15,6 +15,7 @@ Instructions:
 - Queries should be diverse, if the topic is broad, generate more than 1 query.
 - Don't generate multiple similar queries, 1 is enough.
 - Query should ensure that the most current information is gathered. The current date is {current_date}.
+- Pay attention to the prior conversation so that follow-up requests stay grounded in what has already been discussed.
 
 Format:
 - Format your response as a JSON object with ALL two of these exact keys:
@@ -31,7 +32,11 @@ Topic: What revenue grew more last year apple stock or the number of people buyi
 }}
 ```
 
-Context: {research_topic}"""
+Conversation history:
+{conversation_history}
+
+Latest user request:
+{research_topic}"""
 
 
 web_searcher_instructions = """Conduct targeted Google Searches to gather the most recent, credible information on "{research_topic}" and synthesize it into a verifiable text artifact.

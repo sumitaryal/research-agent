@@ -31,27 +31,38 @@ _ALLOWED_SCHEMES = {"http", "https"}
 
 
 def get_research_topic(messages: Sequence[AnyMessage]) -> str:
-    """Aggregate the conversation history into a research topic string."""
+    """Return the most recent user request for downstream planning."""
     if not messages:
         return ""
 
-    if len(messages) == 1:
-        content = messages[-1].content
-        return str(content) if content is not None else ""
-
-    research_topic = ""
-    for message in messages:
+    for message in reversed(messages):
         if isinstance(message, HumanMessage):
-            content = (
-                str(message.content) if message.content is not None else ""
-            )
-            research_topic += f"User: {content}\n"
+            content = message.content
+            return str(content) if content is not None else ""
+
+    fallback = messages[-1].content
+    return str(fallback) if fallback is not None else ""
+
+
+def get_conversation_history(messages: Sequence[AnyMessage]) -> str:
+    """Format prior turns so prompts can reference conversation memory."""
+    if not messages:
+        return ""
+
+    history_lines: list[str] = []
+    for message in messages:
+        content = (message.content or "").strip() if message.content else ""
+        if not content:
+            continue
+        if isinstance(message, HumanMessage):
+            speaker = "User"
         elif isinstance(message, AIMessage):
-            content = (
-                str(message.content) if message.content is not None else ""
-            )
-            research_topic += f"Assistant: {content}\n"
-    return research_topic
+            speaker = "Assistant"
+        else:
+            speaker = getattr(message, "role", None) or "Message"
+        history_lines.append(f"{speaker}: {content}")
+
+    return "\n".join(history_lines)
 
 
 def _normalize_url(url: str) -> str:
